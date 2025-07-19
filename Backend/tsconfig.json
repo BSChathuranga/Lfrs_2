@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "module": "commonjs",
+    "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
+    "lib": ["esnext"],
     "esModuleInterop": true,
-    "resolveJsonModule": true
-  },
-  "include": ["src"],
-  "exclude": ["node_modules"]
+    "module": "commonjs",
+    "target": "ES2020"
+  }
 }
