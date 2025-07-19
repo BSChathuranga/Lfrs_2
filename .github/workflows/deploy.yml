@@ -1,0 +1,59 @@
+name: CI/CD to EC2 with Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_BACKEND: sandunchathuranga/lfrs-backend:latest
+      IMAGE_FRONTEND: sandunchathuranga/lfrs-frontend:latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & Push Backend
+        run: |
+          docker build -t $IMAGE_BACKEND ./backend
+          docker push $IMAGE_BACKEND
+
+      - name: Build & Push Frontend
+        run: |
+          docker build -t $IMAGE_FRONTEND ./frontend
+          docker push $IMAGE_FRONTEND
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+
+            # Create backend.env with secrets
+            echo "MONGODB_URI=${MONGODB_URI}" > /home/ubuntu/backend.env
+            echo "PORT=8000" >> /home/ubuntu/backend.env
+
+            # Create frontend.env with Clerk key
+            echo "VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}" > /home/ubuntu/frontend.env
+
+            docker pull sandunchathuranga/lfrs-backend:latest
+            docker pull sandunchathuranga/lfrs-frontend:latest
+
+            docker stop backend || true
+            docker rm backend || true
+            docker stop frontend || true
+            docker rm frontend || true
+
+            docker run -d --name backend --env-file /home/ubuntu/backend.env -p 8000:8000 sandunchathuranga/lfrs-backend:latest
+            docker run -d --name frontend --env-file /home/ubuntu/frontend.env -p 80:80 sandunchathuranga/lfrs-frontend:latest
+          EOF
