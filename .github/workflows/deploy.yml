@@ -37,26 +37,28 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
 
-            # Create backend.env with secrets
+            # Create backend.env with MongoDB URI, PORT, and Clerk keys
             echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > /home/ubuntu/backend.env
             echo "PORT=8000" >> /home/ubuntu/backend.env
+            echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}" >> /home/ubuntu/backend.env
+            echo "VITE_CLERK_SECRET_KEY=${{ secrets.VITE_CLERK_SECRET_KEY }}" >> /home/ubuntu/backend.env
 
-            # Create frontend.env with Clerk publishable key
+            # Create frontend.env with Clerk publishable key only (usually frontend only needs this)
             echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}" > /home/ubuntu/frontend.env
 
             # Pull latest images
             docker pull $IMAGE_BACKEND
             docker pull $IMAGE_FRONTEND
 
-            # Stop and remove old containers (ignore errors)
+            # Stop & remove old containers (ignore errors)
             docker stop backend || true
             docker rm backend || true
             docker stop frontend || true
             docker rm frontend || true
 
-            # Run containers with environment files and port mapping
+            # Run containers with env files
             docker run -d --name backend --env-file /home/ubuntu/backend.env -p 8000:8000 $IMAGE_BACKEND
             docker run -d --name frontend --env-file /home/ubuntu/frontend.env -p 80:80 $IMAGE_FRONTEND
 
